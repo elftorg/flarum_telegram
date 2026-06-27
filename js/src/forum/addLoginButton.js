@@ -1,6 +1,7 @@
-import {extend} from 'flarum/extend';
-import LogInModal from 'flarum/components/LogInModal';
-import app from 'flarum/app';
+import { extend } from 'flarum/common/extend';
+import LogInModal from 'flarum/forum/components/LogInModal';
+import app from 'flarum/forum/app';
+import m from 'mithril';
 
 export default function () {
     extend(LogInModal.prototype, 'fields', function (items) {
