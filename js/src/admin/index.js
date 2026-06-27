@@ -8,6 +8,7 @@ app.initializers.add('nodeloc-telegram', () => {
                 setting: 'nodeloc-telegram.botUsername',
                 type: 'text',
                 label: app.translator.trans('nodeloc-telegram.admin.settings.field.botUsername'),
+                help: app.translator.trans('nodeloc-telegram.admin.settings.field.botUsername_help'),
             },
             15
         )
@@ -16,6 +17,7 @@ app.initializers.add('nodeloc-telegram', () => {
                 setting: 'nodeloc-telegram.botToken',
                 type: 'text',
                 label: app.translator.trans('nodeloc-telegram.admin.settings.field.botToken'),
+                help: app.translator.trans('nodeloc-telegram.admin.settings.field.botToken_help'),
             },
             15
         )
@@ -23,6 +25,7 @@ app.initializers.add('nodeloc-telegram', () => {
             setting: 'nodeloc-telegram.enableNotifications',
             type: 'boolean',
             label: app.translator.trans('nodeloc-telegram.admin.settings.field.enableNotifications'),
+            help: app.translator.trans('nodeloc-telegram.admin.settings.field.enableNotifications_help'),
         });
 
 });
