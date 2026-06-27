@@ -8,8 +8,8 @@ use Flarum\Forum\Auth\ResponseFactory;
 use Flarum\Http\UrlGenerator;
 use Flarum\Locale\Translator;
 use Flarum\Settings\SettingsRepositoryInterface;
-use Flarum\User\LoginProvider;
 use Laminas\Diactoros\Response\HtmlResponse;
+use Nodeloc\Telegram\Repository\TelegramUserRepository;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface as Request;
 use Psr\Http\Server\RequestHandlerInterface;
@@ -20,39 +20,37 @@ class TelegramAuthController implements RequestHandlerInterface
     protected SettingsRepositoryInterface $settings;
     protected UrlGenerator $url;
     protected Translator $translator;
+    protected TelegramUserRepository $telegramUsers;
 
     public function __construct(
         ResponseFactory $authResponse,
         SettingsRepositoryInterface $settings,
         UrlGenerator $url,
-        Translator $translator
+        Translator $translator,
+        TelegramUserRepository $telegramUsers
     ) {
         $this->authResponse = $authResponse;
         $this->settings = $settings;
         $this->url = $url;
         $this->translator = $translator;
+        $this->telegramUsers = $telegramUsers;
     }
 
     public function handle(Request $request): ResponseInterface
     {
-        $provider = 'telegram';
-
         try {
             $auth = $this->checkTelegramAuthorization($request->getQueryParams());
             $identifier = (string) $auth['id'];
             $user = $request->getAttribute('actor');
 
             if ($user && $user->id) {
-                $existing = $this->findTelegramLoginProvider($identifier);
+                $existing = $this->telegramUsers->findLoginProvider($identifier);
 
                 if ($existing && (int) $existing->user_id !== (int) $user->id) {
                     return $this->processContinue(false, 'nodeloc-telegram.forum.auth.linked_to_another_user');
                 }
 
-                $user->loginProviders()->firstOrCreate([
-                    'provider' => $provider,
-                    'identifier' => $identifier,
-                ]);
+                $this->telegramUsers->linkUser($user, $identifier);
 
                 return $this->processContinue(true);
             }
@@ -63,7 +61,7 @@ class TelegramAuthController implements RequestHandlerInterface
             ]);
 
             return $this->authResponse->make(
-                $provider,
+                TelegramUserRepository::PROVIDER,
                 $identifier,
                 function (Registration $registration) use ($suggestions): void {
                     foreach ($suggestions as $key => $value) {
@@ -97,14 +95,6 @@ class TelegramAuthController implements RequestHandlerInterface
         return new HtmlResponse(
             "<style>body{text-align:center;padding:20px;padding-top:40vh}p{font-family:sans-serif;font-size:2em;color:#aaa}a{color:#333}</style><p>$info</p><p><a href=\"$href\">$continue</a></p>"
         );
-    }
-
-    protected function findTelegramLoginProvider(string $identifier): ?LoginProvider
-    {
-        return LoginProvider::query()
-            ->where('provider', 'telegram')
-            ->where('identifier', $identifier)
-            ->first();
     }
 
     /**
