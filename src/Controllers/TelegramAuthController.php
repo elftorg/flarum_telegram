@@ -2,37 +2,35 @@
 
 namespace Nodeloc\Telegram\Controllers;
 
+use Exception;
 use Flarum\Forum\Auth\Registration;
 use Flarum\Forum\Auth\ResponseFactory;
 use Flarum\Http\UrlGenerator;
-use Flarum\Settings\SettingsRepositoryInterface;
-use Laminas\Diactoros\Stream;
-use Psr\Http\Message\ServerRequestInterface as Request;
-use Exception;
-use Psr\Http\Server\RequestHandlerInterface;
-use Psr\Http\Message\ResponseInterface;
-use Laminas\Diactoros\Response\HtmlResponse;
-use Flarum\User\LoginProvider;
 use Flarum\Locale\Translator;
+use Flarum\Settings\SettingsRepositoryInterface;
+use Flarum\User\LoginProvider;
+use Laminas\Diactoros\Response\HtmlResponse;
+use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\ServerRequestInterface as Request;
+use Psr\Http\Server\RequestHandlerInterface;
 
 class TelegramAuthController implements RequestHandlerInterface
 {
-    protected $authResponse;
-    protected $settings;
-    protected $url;
-    protected $client;
+    protected ResponseFactory $authResponse;
+    protected SettingsRepositoryInterface $settings;
+    protected UrlGenerator $url;
+    protected Translator $translator;
 
-    public function __construct(ResponseFactory $authResponse, SettingsRepositoryInterface $settings, UrlGenerator $url)
-    {
+    public function __construct(
+        ResponseFactory $authResponse,
+        SettingsRepositoryInterface $settings,
+        UrlGenerator $url,
+        Translator $translator
+    ) {
         $this->authResponse = $authResponse;
         $this->settings = $settings;
         $this->url = $url;
-
-        $token = $settings->get('nodeloc-telegram.botToken');
-
-        if (!$token) {
-            throw new Exception('No bot token configured for TelegramProvide');
-        }
+        $this->translator = $translator;
     }
 
     public function handle(Request $request): ResponseInterface
@@ -40,87 +38,119 @@ class TelegramAuthController implements RequestHandlerInterface
         $provider = 'telegram';
 
         try {
-            $auth = $this->checkTelegramAuthorization($_GET);
+            $auth = $this->checkTelegramAuthorization($request->getQueryParams());
+            $identifier = (string) $auth['id'];
             $user = $request->getAttribute('actor');
 
             if ($user && $user->id) {
-                $identifier = $auth['id'] ?? null;
+                $existing = $this->findTelegramLoginProvider($identifier);
 
-                if ($this->checkTelegramId($provider, $identifier)) {
-                    $this->processContinue(false);
+                if ($existing && (int) $existing->user_id !== (int) $user->id) {
+                    return $this->processContinue(false, 'nodeloc-telegram.forum.auth.linked_to_another_user');
                 }
 
-                $user->loginProviders()->create(compact('provider', 'identifier'));
-                $this->processContinue(true);
+                $user->loginProviders()->firstOrCreate([
+                    'provider' => $provider,
+                    'identifier' => $identifier,
+                ]);
+
+                return $this->processContinue(true);
             }
 
-            $suggestions = [];
-            if ($auth['username']) $suggestions['username'] = $auth['username'];
-            if ($auth['photo_url']) $suggestions['avatar_url'] = $auth['photo_url'];
-
+            $suggestions = array_filter([
+                'username' => $auth['username'] ?? null,
+                'avatar_url' => $auth['photo_url'] ?? null,
+            ]);
 
             return $this->authResponse->make(
-                $provider, $auth['id'], function (Registration $registration) use ($suggestions) {
-                    // 设置 TelegramProvide 提供的信息
-                    $registration->provide('username', $suggestions['username']);
-                    $registration->provide('avatar_url', $suggestions['avatar_url']);
+                $provider,
+                $identifier,
+                function (Registration $registration) use ($suggestions): void {
+                    foreach ($suggestions as $key => $value) {
+                        $registration->provide($key, $value);
+                    }
+
                     $registration->setPayload($suggestions);
                 }
             );
         } catch (Exception $e) {
-            $this->processContinue(false);
-            // 在异常情况下返回错误响应
-            return new HtmlResponse('Error: ' . $e->getMessage(), 500);
+            return $this->processContinue(false, null, $e->getMessage());
         }
     }
 
-    public function processContinue(bool $isSuccess): HtmlResponse
+    public function processContinue(bool $isSuccess, ?string $messageKey = null, ?string $fallback = null): HtmlResponse
     {
-        $url = resolve(UrlGenerator::class)->to('forum');
-        $translator = resolve(Translator::class);
-        if(!$isSuccess){
-            $redirect = $url->base().'/settings';
-            $href = htmlentities($redirect);
-            $continue = htmlentities($translator->trans('clarkwinkelmann-auth-popup-failsafe.api.auth.continue'));
-            $newBody = new Stream('php://temp', 'wb+');
-            $info = "You can\'t link this telegram account to this user.";
-            $newBody->write("<style>body{text-align:center;padding:20px;padding-top:40vh}p{font-family:sans-serif;font-size:2em;color:#aaa}a{color:#333}</style><p>$info</p><p><a href=\"$href\">$continue</a></p>");
-            $newBody->rewind();
-            return new HtmlResponse($newBody);
-        }else {
-            $redirect = $url->base() . '/settings';
-            $href = htmlentities($redirect);
-            $info = htmlentities($translator->trans('clarkwinkelmann-auth-popup-failsafe.api.auth.info'));
-            $continue = htmlentities($translator->trans('clarkwinkelmann-auth-popup-failsafe.api.auth.continue'));
-            $newBody = new Stream('php://temp', 'wb+');
-            $newBody->write("<style>body{text-align:center;padding:20px;padding-top:40vh}p{font-family:sans-serif;font-size:2em;color:#aaa}a{color:#333}</style><p>$info</p><p><a href=\"$href\">$continue</a></p>");
-            $newBody->rewind();
-            return new HtmlResponse($newBody);
+        $redirect = $this->url->to('forum')->base().'/settings';
+        $href = htmlentities($redirect, ENT_QUOTES, 'UTF-8');
+        $continue = htmlentities((string) $this->translator->trans('nodeloc-telegram.forum.auth.continue'), ENT_QUOTES, 'UTF-8');
+
+        if ($isSuccess) {
+            $message = (string) $this->translator->trans('nodeloc-telegram.forum.auth.linked');
+        } elseif ($messageKey) {
+            $message = (string) $this->translator->trans($messageKey);
+        } else {
+            $message = $fallback ?: (string) $this->translator->trans('nodeloc-telegram.forum.auth.failed');
         }
-    }
-    protected function checkTelegramId($provider, $identifier)
-    {
-        $provider = LoginProvider::where(compact('provider', 'identifier'))->first();
-        return $provider;
+
+        $info = htmlentities($message, ENT_QUOTES, 'UTF-8');
+
+        return new HtmlResponse(
+            "<style>body{text-align:center;padding:20px;padding-top:40vh}p{font-family:sans-serif;font-size:2em;color:#aaa}a{color:#333}</style><p>$info</p><p><a href=\"$href\">$continue</a></p>"
+        );
     }
 
-    function checkTelegramAuthorization($auth_data) {
-        $check_hash = $auth_data['hash'];
-        unset($auth_data['hash']);
-        $data_check_arr = [];
-        foreach ($auth_data as $key => $value) {
-            $data_check_arr[] = $key . '=' . $value;
+    protected function findTelegramLoginProvider(string $identifier): ?LoginProvider
+    {
+        return LoginProvider::query()
+            ->where('provider', 'telegram')
+            ->where('identifier', $identifier)
+            ->first();
+    }
+
+    /**
+     * @param array<string, mixed> $authData
+     * @return array<string, mixed>
+     */
+    protected function checkTelegramAuthorization(array $authData): array
+    {
+        $token = (string) $this->settings->get('nodeloc-telegram.botToken');
+
+        if ($token === '') {
+            throw new Exception('No bot token configured for Telegram');
         }
-        sort($data_check_arr);
-        $data_check_string = implode("\n", $data_check_arr);
-        $secret_key = hash('sha256', $this->settings->get('nodeloc-telegram.botToken'), true);
-        $hash = hash_hmac('sha256', $data_check_string, $secret_key);
-        if (strcmp($hash, $check_hash) !== 0) {
-            throw new Exception('Data is NOT from TelegramProvide');
+
+        foreach (['id', 'auth_date', 'hash'] as $requiredKey) {
+            if (!isset($authData[$requiredKey]) || $authData[$requiredKey] === '') {
+                throw new Exception('Missing Telegram authorization data');
+            }
         }
-        if ((time() - $auth_data['auth_date']) > 86400) {
-            throw new Exception('Data is outdated');
+
+        $checkHash = (string) $authData['hash'];
+        unset($authData['hash']);
+
+        $dataCheckArr = [];
+
+        foreach ($authData as $key => $value) {
+            if (is_array($value)) {
+                continue;
+            }
+
+            $dataCheckArr[] = $key.'='.$value;
         }
-        return $auth_data;
+
+        sort($dataCheckArr);
+        $dataCheckString = implode("\n", $dataCheckArr);
+        $secretKey = hash('sha256', $token, true);
+        $hash = hash_hmac('sha256', $dataCheckString, $secretKey);
+
+        if (!hash_equals($hash, $checkHash)) {
+            throw new Exception('Data is not from Telegram');
+        }
+
+        if ((time() - (int) $authData['auth_date']) > 86400) {
+            throw new Exception('Telegram authorization data is outdated');
+        }
+
+        return $authData;
     }
 }

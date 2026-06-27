@@ -19,12 +19,14 @@
         }
     ],
     "support": {
-        "issues": "https://github.com/nodeloc/telegram/issues",
-        "source": "https://github.com/nodeloc/telegram"
+        "issues": "https://github.com/elftorg/flarum_telegram/issues",
+        "source": "https://github.com/elftorg/flarum_telegram"
     },
     "require": {
-        "flarum/core": "^1.8.0",
-        "irazasyed/telegram-bot-sdk": "^3.9"},
+        "php": ">=8.1 <8.4",
+        "flarum/core": "^1.8.14",
+        "irazasyed/telegram-bot-sdk": "^3.9"
+    },
     "extra": {
         "flarum-extension": {
             "title": "Telegram",
