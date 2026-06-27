@@ -1,11 +1,10 @@
 (function () {
     'use strict';
 
+    var extensionExports = {};
     var core = window.flarum && window.flarum.core ? window.flarum.core : {};
     var compat = core.compat || {};
     var app = unwrap(resolve('forum/app', resolve('app')));
-    var extendModule = unwrap(resolve('common/extend', resolve('extend')));
-    var extend = typeof extendModule === 'function' ? extendModule : extendModule && extendModule.extend;
     var User = unwrap(resolve('common/models/User', resolve('models/User')));
     var Model = unwrap(resolve('common/Model', resolve('Model')));
     var LogInModal = unwrap(resolve('forum/components/LogInModal', resolve('components/LogInModal')));
@@ -13,7 +12,9 @@
     var SettingsPage = unwrap(resolve('forum/components/SettingsPage', resolve('components/SettingsPage')));
     var m = window.m || unwrap(resolve('mithril'));
 
-    if (!app || typeof extend !== 'function' || !User || !Model || !LogInModal || !m) {
+    exportExtension(extensionExports);
+
+    if (!app || !User || !Model || !LogInModal || !m) {
         return;
     }
 
@@ -21,7 +22,7 @@
         User.prototype.canReceiveTelegramNotifications = Model.attribute('canReceiveTelegramNotifications');
         User.prototype.nodelocTelegramError = Model.attribute('nodelocTelegramError');
 
-        extend(LogInModal.prototype, 'fields', function (items) {
+        extendMethod(LogInModal.prototype, 'fields', function (items) {
             if (!app.forum.attribute('nodeloc-telegram.botUsername')) {
                 return;
             }
@@ -36,7 +37,7 @@
         });
 
         if (NotificationGrid) {
-            extend(NotificationGrid.prototype, 'notificationMethods', function (items) {
+            extendMethod(NotificationGrid.prototype, 'notificationMethods', function (items) {
                 if (!app.forum.attribute('nodeloc-telegram.enableNotifications')) {
                     return;
                 }
@@ -58,7 +59,7 @@
         }
 
         if (SettingsPage) {
-            extend(SettingsPage.prototype, 'accountItems', function (items) {
+            extendMethod(SettingsPage.prototype, 'accountItems', function (items) {
                 if (!app.forum.attribute('nodeloc-telegram.enableNotifications')) {
                     return;
                 }
@@ -72,7 +73,7 @@
                 }
             });
 
-            extend(SettingsPage.prototype, 'notificationsItems', function (items) {
+            extendMethod(SettingsPage.prototype, 'notificationsItems', function (items) {
                 if (!app.forum.attribute('nodeloc-telegram.enableNotifications')) {
                     return;
                 }
@@ -135,5 +136,32 @@
 
     function unwrap(module) {
         return module && (module.default || module);
+    }
+
+    function extendMethod(object, method, callback) {
+        var original = object[method];
+
+        object[method] = function () {
+            var args = Array.prototype.slice.call(arguments);
+            var value = original ? original.apply(this, args) : undefined;
+
+            callback.apply(this, [value].concat(args));
+
+            return value;
+        };
+
+        if (original) {
+            Object.assign(object[method], original);
+        }
+    }
+
+    function exportExtension(exports) {
+        if (typeof module !== 'undefined') {
+            module.exports = exports;
+        }
+
+        if (window.flarum && window.flarum.extensions) {
+            window.flarum.extensions['nodeloc-telegram'] = exports;
+        }
     }
 }());
