@@ -22,6 +22,8 @@
         User.prototype.canReceiveTelegramNotifications = Model.attribute('canReceiveTelegramNotifications');
         User.prototype.nodelocTelegramError = Model.attribute('nodelocTelegramError');
 
+        consumeTelegramAuthPayload();
+
         extendMethod(LogInModal.prototype, 'fields', function (items) {
             if (!app.forum.attribute('nodeloc-telegram.botUsername')) {
                 return;
@@ -120,6 +122,21 @@
                 }),
             ]
         );
+    }
+
+    function consumeTelegramAuthPayload() {
+        if (!window.sessionStorage || typeof app.authenticationComplete !== 'function') {
+            return;
+        }
+
+        var payload = window.sessionStorage.getItem('nodelocTelegramAuthPayload');
+
+        if (!payload) {
+            return;
+        }
+
+        window.sessionStorage.removeItem('nodelocTelegramAuthPayload');
+        app.authenticationComplete(JSON.parse(payload));
     }
 
     function resolve(name, fallback) {
