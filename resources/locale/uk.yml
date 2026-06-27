@@ -1,0 +1,28 @@
+nodeloc-telegram:
+    admin:
+        settings:
+            title: Налаштування Telegram
+            description: Налаштуйте вхід, реєстрацію та опціональну доставку сповіщень Flarum через Telegram.
+
+            field:
+                botUsername: Ім'я бота
+                botUsername_help: Вкажіть публічне ім'я Telegram-бота без символу @. Домен бота має бути налаштований у BotFather для домену вашого форуму.
+                botToken: Токен бота
+                botToken_help: Вкажіть токен, створений у BotFather для цього самого бота.
+                enableNotifications: Увімкнути сповіщення
+                enableNotifications_help: Запитувати в користувачів дозвіл на повідомлення від бота та додати Telegram як спосіб доставки сповіщень.
+
+    forum:
+        log_in_with_telegram_button: Увійти через Telegram
+        sign_up_with_telegram_button: Зареєструватися через Telegram
+        link_telegram_button: Прив'язати Telegram
+
+        auth:
+            continue: Продовжити
+            failed: Авторизація через Telegram не вдалася.
+            linked: Обліковий запис Telegram успішно прив'язано.
+            linked_to_another_user: Цей обліковий запис Telegram уже прив'язаний до іншого користувача.
+
+        settings:
+            notify_by_telegram_heading: Telegram
+            unblock_telegram_bot: Схоже, ви не авторизували Telegram-бота або заблокували його. Надішліть повідомлення боту <a>{username}</a> у Telegram, щоб знову ввімкнути сповіщення
