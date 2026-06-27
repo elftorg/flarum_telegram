@@ -24,5 +24,4 @@ app.initializers.add('nodeloc-telegram', () => {
             type: 'boolean',
             label: app.translator.trans('nodeloc-telegram.admin.settings.field.enableNotifications'),
         });
-
 });
