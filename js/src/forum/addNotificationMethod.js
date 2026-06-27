@@ -1,13 +1,13 @@
-import { extend } from 'flarum/common/extend';
 import app from 'flarum/forum/app';
 import NotificationGrid from 'flarum/forum/components/NotificationGrid';
 import SettingsPage from 'flarum/forum/components/SettingsPage';
 import m from 'mithril';
 
 import { telegramLoginWidget } from './addLoginButton';
+import extendMethod from './extendMethod';
 
 export default function () {
-    extend(NotificationGrid.prototype, 'notificationMethods', function (items) {
+    extendMethod(NotificationGrid.prototype, 'notificationMethods', function (items) {
         if (!app.forum.attribute('nodeloc-telegram.enableNotifications')) {
             return;
         }
@@ -27,7 +27,7 @@ export default function () {
         });
     });
 
-    extend(SettingsPage.prototype, 'accountItems', function (items) {
+    extendMethod(SettingsPage.prototype, 'accountItems', function (items) {
         if (!app.forum.attribute('nodeloc-telegram.enableNotifications')) {
             return;
         }
@@ -41,7 +41,7 @@ export default function () {
         }
     });
 
-    extend(SettingsPage.prototype, 'notificationsItems', function (items) {
+    extendMethod(SettingsPage.prototype, 'notificationsItems', function (items) {
         if (!app.forum.attribute('nodeloc-telegram.enableNotifications')) {
             return;
         }
