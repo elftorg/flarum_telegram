@@ -6,62 +6,33 @@ use Exception;
 use Flarum\Notification\Blueprint\BlueprintInterface;
 use Flarum\Notification\MailableInterface;
 use Flarum\Settings\SettingsRepositoryInterface;
-use Flarum\User\LoginProvider;
 use Flarum\User\User;
 use GuzzleHttp\Exception\ClientException;
-use Illuminate\Contracts\Mail\Mailer;
-use Illuminate\Contracts\Translation\Translator;
 use Illuminate\Contracts\View\Factory;
 use Illuminate\Support\Arr;
-use Symfony\Contracts\Translation\TranslatorInterface;
+use Nodeloc\Telegram\Repository\TelegramUserRepository;
 use Telegram\Bot\Api;
 use Telegram\Bot\Exceptions\TelegramSDKException;
 
 class TelegramMailer
 {
-    protected Mailer $mailer;
+    protected Api $telegram;
 
     /**
-     * @var TranslatorInterface&Translator
-     */
-    protected $translator;
-
-    protected SettingsRepositoryInterface $settings;
-    protected Factory $view;
-    protected Api $telegramclient;
-
-    /**
-     * @param TranslatorInterface&Translator $translator
      * @throws TelegramSDKException
      */
     public function __construct(
-        Mailer $mailer,
-        TranslatorInterface $translator,
         SettingsRepositoryInterface $settings,
-        Factory $view
+        protected Factory $view,
+        protected TelegramUserRepository $telegramUsers
     ) {
-        $this->mailer = $mailer;
-        $this->translator = $translator;
-        $this->settings = $settings;
-        $this->view = $view;
-
         $token = (string) $settings->get('nodeloc-telegram.botToken');
 
         if ($token === '') {
             throw new Exception('No bot token configured for Telegram');
         }
 
-        $this->telegramclient = new Api($token);
-    }
-
-    protected function getTelegramId(User $user): ?string
-    {
-        $provider = LoginProvider::query()
-            ->where('user_id', $user->id)
-            ->where('provider', 'telegram')
-            ->first();
-
-        return $provider ? (string) $provider->identifier : null;
+        $this->telegram = new Api($token);
     }
 
     public function send(BlueprintInterface $blueprint, array $users): void
@@ -73,12 +44,10 @@ class TelegramMailer
         $view = $this->pickBestView($blueprint->getEmailView());
 
         foreach ($users as $user) {
-            $text = $this->view->make($view, compact('blueprint', 'user'))->render();
-            $telegramId = $user->getAttribute('flagrow_telegram_id') ?: $this->getTelegramId($user);
+            $telegramId = $user->getAttribute('flagrow_telegram_id') ?: $this->telegramUsers->findUserTelegramId($user);
 
             if (!$telegramId) {
-                $user->flagrow_telegram_error = 'missing';
-                $user->save();
+                $this->markError($user, 'missing');
                 continue;
             }
 
@@ -88,9 +57,9 @@ class TelegramMailer
             }
 
             try {
-                $this->telegramclient->sendMessage([
+                $this->telegram->sendMessage([
                     'chat_id' => $telegramId,
-                    'text' => $text,
+                    'text' => $this->view->make($view, compact('blueprint', 'user'))->render(),
                 ]);
 
                 if ($user->flagrow_telegram_error) {
@@ -100,8 +69,7 @@ class TelegramMailer
             } catch (ClientException $exception) {
                 $this->handleFailedSend($user, $exception);
             } catch (TelegramSDKException $exception) {
-                $user->flagrow_telegram_error = 'unauthorized';
-                $user->save();
+                $this->markError($user, 'unauthorized');
             }
         }
     }
@@ -114,22 +82,26 @@ class TelegramMailer
             throw $exception;
         }
 
-        $user->flagrow_telegram_error = 'unauthorized';
+        $error = 'unauthorized';
 
         if ($response) {
             $json = json_decode($response->getBody()->getContents(), true);
 
             if ($json && str_contains(Arr::get($json, 'description', ''), 'blocked by the user')) {
-                $user->flagrow_telegram_error = 'blocked';
+                $error = 'blocked';
             }
         }
 
+        $this->markError($user, $error);
+    }
+
+    protected function markError(User $user, string $error): void
+    {
+        $user->flagrow_telegram_error = $error;
         $user->save();
     }
 
     /**
-     * Read the same way as Illuminate\Mail\Mailer::parseView().
-     *
      * @param mixed $view
      * @throws Exception
      */

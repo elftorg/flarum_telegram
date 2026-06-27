@@ -1,0 +1,6 @@
+{
+    "extends": "flarum-tsconfig",
+    "include": [
+        "src/**/*"
+    ]
+}
