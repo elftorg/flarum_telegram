@@ -50,16 +50,11 @@ class TelegramMailer
 
         foreach ($users as $user) {
             $text = $this->view->make($view, compact('blueprint', 'user'))->render();
-            $telegramId = $user->getAttribute('flagrow_telegram_id') ?: $this->telegramUsers->findUserTelegramId($user);
+            $telegramId = $this->telegramUsers->findUserTelegramId($user);
 
             if (!$telegramId) {
                 $this->markError($user, 'missing');
                 continue;
-            }
-
-            if (!$user->getAttribute('flagrow_telegram_id')) {
-                $user->setAttribute('flagrow_telegram_id', $telegramId);
-                $user->save();
             }
 
             try {
@@ -68,9 +63,8 @@ class TelegramMailer
                     'text' => $text,
                 ]);
 
-                if ($user->getAttribute('flagrow_telegram_error')) {
-                    $user->setAttribute('flagrow_telegram_error', null);
-                    $user->save();
+                if ($this->telegramUsers->getTelegramError($user)) {
+                    $this->telegramUsers->setTelegramError($user, null);
                 }
             } catch (ClientException $exception) {
                 $this->handleFailedSend($user, $exception);
@@ -103,8 +97,7 @@ class TelegramMailer
 
     protected function markError(User $user, string $error): void
     {
-        $user->setAttribute('flagrow_telegram_error', $error);
-        $user->save();
+        $this->telegramUsers->setTelegramError($user, $error);
     }
 
     /**
