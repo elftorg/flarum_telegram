@@ -8,13 +8,14 @@
     var User = unwrap(resolve('common/models/User', resolve('models/User')));
     var Model = unwrap(resolve('common/Model', resolve('Model')));
     var LogInModal = unwrap(resolve('forum/components/LogInModal', resolve('components/LogInModal')));
+    var SignUpModal = unwrap(resolve('forum/components/SignUpModal', resolve('components/SignUpModal')));
     var NotificationGrid = unwrap(resolve('forum/components/NotificationGrid', resolve('components/NotificationGrid')));
     var SettingsPage = unwrap(resolve('forum/components/SettingsPage', resolve('components/SettingsPage')));
     var m = window.m || unwrap(resolve('mithril'));
 
     exportExtension(extensionExports);
 
-    if (!app || !User || !Model || !LogInModal || !m) {
+    if (!app || !User || !Model || !m) {
         return;
     }
 
@@ -24,19 +25,13 @@
 
         consumeTelegramAuthPayload();
 
-        extendMethod(LogInModal.prototype, 'fields', function (items) {
-            if (!app.forum.attribute('nodeloc-telegram.botUsername')) {
-                return;
-            }
+        if (LogInModal) {
+            addTelegramAuthButton(LogInModal, 'nodeloc-telegram.forum.log_in_with_telegram_button');
+        }
 
-            items.add(
-                'nodeloc-telegram',
-                m('.Form-group.NodelocTelegramLoginFormGroup', telegramLoginWidget(
-                    'nodeloc-telegram.forum.log_in_with_telegram_button'
-                )),
-                -20
-            );
-        });
+        if (SignUpModal) {
+            addTelegramAuthButton(SignUpModal, 'nodeloc-telegram.forum.sign_up_with_telegram_button', true);
+        }
 
         if (NotificationGrid) {
             extendMethod(NotificationGrid.prototype, 'notificationMethods', function (items) {
@@ -101,6 +96,24 @@
             });
         }
     });
+
+    function addTelegramAuthButton(ModalClass, labelKey, skipWhenToken) {
+        extendMethod(ModalClass.prototype, 'fields', function (items) {
+            if (!app.forum.attribute('nodeloc-telegram.botUsername')) {
+                return;
+            }
+
+            if (skipWhenToken && this.attrs && this.attrs.token) {
+                return;
+            }
+
+            items.add(
+                'nodeloc-telegram',
+                m('.Form-group.NodelocTelegramLoginFormGroup', telegramLoginWidget(labelKey)),
+                -20
+            );
+        });
+    }
 
     function telegramLoginWidget(labelKey) {
         return m(
