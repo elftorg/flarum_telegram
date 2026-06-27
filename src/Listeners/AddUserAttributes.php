@@ -19,7 +19,7 @@ class AddUserAttributes
     {
         return [
             'canReceiveTelegramNotifications' => $this->telegramUsers->hasTelegramLogin($user),
-            'nodelocTelegramError' => $user->getAttribute('flagrow_telegram_error'),
+            'nodelocTelegramError' => $this->telegramUsers->getTelegramError($user),
         ];
     }
 }
