@@ -8,53 +8,42 @@ use Flarum\Forum\Auth\ResponseFactory;
 use Flarum\Http\UrlGenerator;
 use Flarum\Locale\Translator;
 use Flarum\Settings\SettingsRepositoryInterface;
-use Flarum\User\LoginProvider;
-use Laminas\Diactoros\Response\HtmlResponse;
+use Laminas\Diactoros\Response\RedirectResponse;
+use Nodeloc\Telegram\Repository\TelegramUserRepository;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface as Request;
 use Psr\Http\Server\RequestHandlerInterface;
 
 class TelegramAuthController implements RequestHandlerInterface
 {
-    protected ResponseFactory $authResponse;
-    protected SettingsRepositoryInterface $settings;
-    protected UrlGenerator $url;
-    protected Translator $translator;
-
     public function __construct(
-        ResponseFactory $authResponse,
-        SettingsRepositoryInterface $settings,
-        UrlGenerator $url,
-        Translator $translator
+        protected ResponseFactory $authResponse,
+        protected SettingsRepositoryInterface $settings,
+        protected UrlGenerator $url,
+        protected Translator $translator,
+        protected TelegramUserRepository $telegramUsers
     ) {
-        $this->authResponse = $authResponse;
-        $this->settings = $settings;
-        $this->url = $url;
-        $this->translator = $translator;
     }
 
     public function handle(Request $request): ResponseInterface
     {
-        $provider = 'telegram';
+        $returnTo = $this->returnTo($request);
 
         try {
             $auth = $this->checkTelegramAuthorization($request->getQueryParams());
             $identifier = (string) $auth['id'];
-            $user = $request->getAttribute('actor');
+            $actor = $request->getAttribute('actor');
 
-            if ($user && $user->id) {
-                $existing = $this->findTelegramLoginProvider($identifier);
+            if ($actor && $actor->id) {
+                $existing = $this->telegramUsers->findLoginProvider($identifier);
 
-                if ($existing && (int) $existing->user_id !== (int) $user->id) {
-                    return $this->processContinue(false, 'nodeloc-telegram.forum.auth.linked_to_another_user');
+                if ($existing && (int) $existing->user_id !== (int) $actor->id) {
+                    return $this->redirectWithFlash('linked_to_another_user', '/settings');
                 }
 
-                $user->loginProviders()->firstOrCreate([
-                    'provider' => $provider,
-                    'identifier' => $identifier,
-                ]);
+                $this->telegramUsers->linkUser($actor, $identifier);
 
-                return $this->processContinue(true);
+                return $this->redirectWithFlash('linked', '/settings');
             }
 
             $suggestions = array_filter([
@@ -63,7 +52,7 @@ class TelegramAuthController implements RequestHandlerInterface
             ]);
 
             return $this->authResponse->make(
-                $provider,
+                TelegramUserRepository::PROVIDER,
                 $identifier,
                 function (Registration $registration) use ($suggestions): void {
                     foreach ($suggestions as $key => $value) {
@@ -71,40 +60,33 @@ class TelegramAuthController implements RequestHandlerInterface
                     }
 
                     $registration->setPayload($suggestions);
-                }
+                },
+                $returnTo
             );
         } catch (Exception $e) {
-            return $this->processContinue(false, null, $e->getMessage());
+            return $this->redirectWithFlash('failed', '/');
         }
     }
 
-    public function processContinue(bool $isSuccess, ?string $messageKey = null, ?string $fallback = null): HtmlResponse
+    protected function returnTo(Request $request): string
     {
-        $redirect = $this->url->to('forum')->base().'/settings';
-        $href = htmlentities($redirect, ENT_QUOTES, 'UTF-8');
-        $continue = htmlentities((string) $this->translator->trans('nodeloc-telegram.forum.auth.continue'), ENT_QUOTES, 'UTF-8');
+        $returnTo = $request->getQueryParams()['returnTo'] ?? '/';
 
-        if ($isSuccess) {
-            $message = (string) $this->translator->trans('nodeloc-telegram.forum.auth.linked');
-        } elseif ($messageKey) {
-            $message = (string) $this->translator->trans($messageKey);
-        } else {
-            $message = $fallback ?: (string) $this->translator->trans('nodeloc-telegram.forum.auth.failed');
+        if (!is_string($returnTo) || !str_starts_with($returnTo, '/') || str_starts_with($returnTo, '//')) {
+            return '/';
         }
 
-        $info = htmlentities($message, ENT_QUOTES, 'UTF-8');
+        return $returnTo;
+    }
 
-        return new HtmlResponse(
-            "<style>body{text-align:center;padding:20px;padding-top:40vh}p{font-family:sans-serif;font-size:2em;color:#aaa}a{color:#333}</style><p>$info</p><p><a href=\"$href\">$continue</a></p>"
+    protected function redirectWithFlash(string $key, string $path): RedirectResponse
+    {
+        $message = $this->translator->trans('nodeloc-telegram.forum.auth.'.$key);
+        $separator = str_contains($path, '?') ? '&' : '?';
+
+        return new RedirectResponse(
+            $this->url->to('forum')->base().$path.$separator.'telegramMessage='.rawurlencode((string) $message)
         );
-    }
-
-    protected function findTelegramLoginProvider(string $identifier): ?LoginProvider
-    {
-        return LoginProvider::query()
-            ->where('provider', 'telegram')
-            ->where('identifier', $identifier)
-            ->first();
     }
 
     /**
@@ -126,7 +108,7 @@ class TelegramAuthController implements RequestHandlerInterface
         }
 
         $checkHash = (string) $authData['hash'];
-        unset($authData['hash']);
+        unset($authData['hash'], $authData['returnTo']);
 
         $dataCheckArr = [];
 
