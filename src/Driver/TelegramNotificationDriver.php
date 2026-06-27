@@ -8,15 +8,15 @@ use Flarum\Notification\MailableInterface;
 use Flarum\User\User;
 use Illuminate\Contracts\Queue\Queue;
 use Nodeloc\Telegram\Job\SendTelegramNotificationJob;
+use Nodeloc\Telegram\Repository\TelegramUserRepository;
 use ReflectionClass;
 
 class TelegramNotificationDriver implements NotificationDriverInterface
 {
-    protected Queue $queue;
-
-    public function __construct(Queue $queue)
-    {
-        $this->queue = $queue;
+    public function __construct(
+        protected Queue $queue,
+        protected TelegramUserRepository $telegramUsers
+    ) {
     }
 
     public function send(BlueprintInterface $blueprint, array $users): void
@@ -40,16 +40,7 @@ class TelegramNotificationDriver implements NotificationDriverInterface
             return false;
         }
 
-        return $this->getTelegramId($user) !== null;
-    }
-
-    protected function getTelegramId(User $user): ?string
-    {
-        $provider = $user->loginProviders()
-            ->where('provider', 'telegram')
-            ->first();
-
-        return $provider ? (string) $provider->identifier : null;
+        return $this->telegramUsers->hasTelegramLogin($user);
     }
 
     public function registerType(string $blueprintClass, array $driversEnabledByDefault): void
