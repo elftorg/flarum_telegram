@@ -1,12 +1,13 @@
 {
     "name": "nodeloc/telegram",
-    "description": "Telegram login and notifications for Flarum",
+    "description": "Telegram login, registration and notifications for Flarum",
     "keywords": [
         "extension",
         "flarum",
         "nodeloc",
         "telegram",
         "auth",
+        "registration",
         "notifications"
     ],
     "type": "flarum-extension",
