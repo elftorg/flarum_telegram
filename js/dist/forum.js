@@ -4,10 +4,10 @@
     var core = window.flarum && window.flarum.core ? window.flarum.core : {};
     var app = resolve('forum/app', core.app);
     var extendModule = resolve('common/extend', core.extend || {});
-    var extend = extendModule.extend || extendModule.default?.extend || extendModule;
+    var extend = extendModule.extend || (extendModule.default && extendModule.default.extend) || extendModule;
     var User = resolve('common/models/User', resolve('models/User'));
     var Model = resolve('common/Model', resolve('Model'));
-    var LogInButtons = resolve('forum/components/LogInButtons', resolve('components/LogInButtons'));
+    var LogInModal = resolve('forum/components/LogInModal', resolve('components/LogInModal'));
     var NotificationGrid = resolve('forum/components/NotificationGrid', resolve('components/NotificationGrid'));
     var SettingsPage = resolve('forum/components/SettingsPage', resolve('components/SettingsPage'));
     var m = window.m || core.m;
@@ -15,11 +15,11 @@
     app = app && (app.default || app);
     User = User && (User.default || User);
     Model = Model && (Model.default || Model);
-    LogInButtons = LogInButtons && (LogInButtons.default || LogInButtons);
+    LogInModal = LogInModal && (LogInModal.default || LogInModal);
     NotificationGrid = NotificationGrid && (NotificationGrid.default || NotificationGrid);
     SettingsPage = SettingsPage && (SettingsPage.default || SettingsPage);
 
-    if (!app || !extend || !User || !Model || !m) {
+    if (!app || !extend || !User || !Model || !LogInModal || !m) {
         return;
     }
 
@@ -29,17 +29,20 @@
 
         showTelegramMessage();
 
-        if (LogInButtons) {
-            extend(LogInButtons.prototype, 'items', function (items) {
-                var botUsername = app.forum.attribute('nodeloc-telegram.botUsername');
+        extend(LogInModal.prototype, 'fields', function (items) {
+            if (!app.forum.attribute('nodeloc-telegram.botUsername')) {
+                return;
+            }
 
-                if (!botUsername) {
-                    return;
-                }
-
-                items.add('nodeloc-telegram', telegramLoginWidget('/'));
-            });
-        }
+            items.add(
+                'nodeloc-telegram',
+                m('.Form-group.NodelocTelegramLoginFormGroup', telegramLoginWidget(
+                    '/',
+                    'nodeloc-telegram.forum.log_in_with_telegram_button'
+                )),
+                -20
+            );
+        });
 
         if (NotificationGrid) {
             extend(NotificationGrid.prototype, 'notificationMethods', function (items) {
@@ -73,7 +76,7 @@
                     return;
                 }
 
-                items.add('nodeloc-telegram', telegramLoginWidget('/settings'));
+                items.add('nodeloc-telegram', telegramLoginWidget('/settings', 'nodeloc-telegram.forum.link_telegram_button'));
             });
 
             extend(SettingsPage.prototype, 'notificationsItems', function (items) {
@@ -100,16 +103,26 @@
         }
     });
 
-    function telegramLoginWidget(returnTo) {
-        return m('script', {
-            async: true,
-            src: 'https://telegram.org/js/telegram-widget.js?22',
-            'data-telegram-login': app.forum.attribute('nodeloc-telegram.botUsername'),
-            'data-size': 'large',
-            'data-radius': '10',
-            'data-auth-url': app.forum.attribute('baseUrl') + '/auth/telegram?returnTo=' + encodeURIComponent(returnTo),
-            'data-request-access': 'write',
-        });
+    function telegramLoginWidget(returnTo, labelKey) {
+        return m(
+            '.NodelocTelegramLoginButton.Button.Button--primary.Button--block',
+            {
+                role: 'button',
+                'aria-label': app.translator.trans(labelKey),
+            },
+            [
+                m('span', app.translator.trans(labelKey)),
+                m('script', {
+                    async: true,
+                    src: 'https://telegram.org/js/telegram-widget.js?22',
+                    'data-telegram-login': app.forum.attribute('nodeloc-telegram.botUsername'),
+                    'data-size': 'large',
+                    'data-radius': '10',
+                    'data-auth-url': app.forum.attribute('baseUrl') + '/auth/telegram?returnTo=' + encodeURIComponent(returnTo),
+                    'data-request-access': 'write',
+                }),
+            ]
+        );
     }
 
     function showTelegramMessage() {
