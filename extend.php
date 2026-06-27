@@ -18,7 +18,6 @@ return [
     (new Extend\Notification())
         ->driver('telegram', TelegramNotificationDriver::class),
     (new Extend\Settings())
-        ->default('nodeloc-telegram.enableNotifications', false)
         ->serializeToForum('nodeloc-telegram.botUsername', 'nodeloc-telegram.botUsername')
         ->serializeToForum('nodeloc-telegram.enableNotifications', 'nodeloc-telegram.enableNotifications', 'boolval'),
     (new Extend\Frontend('admin'))
