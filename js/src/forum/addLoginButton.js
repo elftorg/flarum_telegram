@@ -1,21 +1,41 @@
 import {extend} from 'flarum/extend';
-import LogInButtons from 'flarum/components/LogInButtons';
+import LogInModal from 'flarum/components/LogInModal';
 import app from 'flarum/app';
 
 export default function () {
-    extend(LogInButtons.prototype, 'items', function (items) {
-            const authUrl = app.forum.attribute('baseUrl') + '/auth/telegram';
-            const botUsername = app.forum.attribute('nodeloc-telegram.botUsername');
-            // Replace the TelegramProvide widget script
-            items.add('nodeloc-telegram',
-                m('script', {
-                    async: true, src: 'https://telegram.org/js/telegram-widget.js?22',
-                    'data-telegram-login': botUsername,
-                    'data-size': 'large',
-                    'data-radius': '10',
-                    'data-auth-url': authUrl,
-                    'data-request-access': 'write'
-                })
-            );
+    extend(LogInModal.prototype, 'fields', function (items) {
+        if (!app.forum.attribute('nodeloc-telegram.botUsername')) {
+            return;
+        }
+
+        items.add(
+            'nodeloc-telegram',
+            m('.Form-group.NodelocTelegramLoginFormGroup', telegramLoginWidget(
+                'nodeloc-telegram.forum.log_in_with_telegram_button'
+            )),
+            -20
+        );
     });
+}
+
+export function telegramLoginWidget(labelKey) {
+    return m(
+        '.NodelocTelegramLoginButton.Button.Button--primary.Button--block',
+        {
+            role: 'button',
+            'aria-label': app.translator.trans(labelKey),
+        },
+        [
+            m('span', app.translator.trans(labelKey)),
+            m('script', {
+                async: true,
+                src: 'https://telegram.org/js/telegram-widget.js?22',
+                'data-telegram-login': app.forum.attribute('nodeloc-telegram.botUsername'),
+                'data-size': 'large',
+                'data-radius': '10',
+                'data-auth-url': app.forum.attribute('baseUrl') + '/auth/telegram',
+                'data-request-access': 'write',
+            }),
+        ]
+    );
 }
