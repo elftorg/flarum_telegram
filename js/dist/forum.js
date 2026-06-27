@@ -1,2 +1,150 @@
-(()=>{var e={n:t=>{var o=t&&t.__esModule?()=>t.default:()=>t;return e.d(o,{a:o}),o},d:(t,o)=>{for(var r in o)e.o(o,r)&&!e.o(t,r)&&Object.defineProperty(t,r,{enumerable:!0,get:o[r]})},o:(e,t)=>Object.prototype.hasOwnProperty.call(e,t),r:e=>{"undefined"!=typeof Symbol&&Symbol.toStringTag&&Object.defineProperty(e,Symbol.toStringTag,{value:"Module"}),Object.defineProperty(e,"__esModule",{value:!0})}},t={};(()=>{"use strict";e.r(t);const o=flarum.core.compat.app;var r=e.n(o);const a=flarum.core.compat["models/User"];var n=e.n(a);const s=flarum.core.compat.Model;var i=e.n(s);const l=flarum.core.compat.extend,c=flarum.core.compat["components/LogInButtons"];var u=e.n(c);const d=flarum.core.compat["components/NotificationGrid"];var g=e.n(d);const f=flarum.core.compat["components/SettingsPage"];var p=e.n(f);flarum.core.compat["components/LogInButton"],r().initializers.add("nodeloc-telegram",(function(){n().prototype.canReceiveTelegramNotifications=i().attribute("canReceiveTelegramNotifications"),n().prototype.nodelocTelegramError=i().attribute("nodelocTelegramError"),(0,l.extend)(u().prototype,"items",(function(e){var t=r().forum.attribute("baseUrl")+"/auth/telegram",o=r().forum.attribute("nodeloc-telegram.botUsername");e.add("nodeloc-telegram",m("script",{async:!0,src:"https://telegram.org/js/telegram-widget.js?22","data-telegram-login":o,"data-size":"large","data-radius":"10","data-auth-url":t,"data-request-access":"write"}))})),(0,l.extend)(g().prototype,"notificationMethods",(function(e){if(r().forum.attribute("nodeloc-telegram.enableNotifications")&&r().session&&r().session.user){var t=r().session.user;t&&t.canReceiveTelegramNotifications()&&e.add("telegram",{name:"telegram",icon:"fab fa-telegram-plane",label:r().translator.trans("nodeloc-telegram.forum.settings.notify_by_telegram_heading")})}})),(0,l.extend)(p().prototype,"accountItems",(function(e){if(r().forum.attribute("nodeloc-telegram.enableNotifications")&&r().session&&r().session.user){var t=r().session.user;if(t&&!t.canReceiveTelegramNotifications()){var o=r().forum.attribute("baseUrl")+"/auth/telegram",a=r().forum.attribute("nodeloc-telegram.botUsername");e.add("nodeloc-telegram",m("script",{async:!0,src:"https://telegram.org/js/telegram-widget.js?22","data-telegram-login":a,"data-size":"large","data-radius":"10","data-auth-url":o,"data-request-access":"write"}))}}})),(0,l.extend)(p().prototype,"notificationsItems",(function(e){if(r().forum.attribute("nodeloc-telegram.enableNotifications")&&r().session&&r().session.user){var t=r().session.user;if(t&&t.nodelocTelegramError()){var o=r().forum.attribute("nodeloc-telegram.botUsername");e.add("nodelocTelegramError",{view:function(){return m(".Alert",m("p",r().translator.trans("nodeloc-telegram.forum.settings.unblock_telegram_bot",{a:m("a",{href:"https://t.me/"+o}),username:"@"+o})))}})}}}))}))})(),module.exports=t})();
-//# sourceMappingURL=forum.js.map
+(function () {
+    'use strict';
+
+    var core = window.flarum && window.flarum.core ? window.flarum.core : {};
+    var app = resolve('forum/app', core.app);
+    var extendModule = resolve('common/extend', core.extend || {});
+    var extend = extendModule.extend || extendModule.default?.extend || extendModule;
+    var User = resolve('common/models/User', resolve('models/User'));
+    var Model = resolve('common/Model', resolve('Model'));
+    var LogInButtons = resolve('forum/components/LogInButtons', resolve('components/LogInButtons'));
+    var NotificationGrid = resolve('forum/components/NotificationGrid', resolve('components/NotificationGrid'));
+    var SettingsPage = resolve('forum/components/SettingsPage', resolve('components/SettingsPage'));
+    var m = window.m || core.m;
+
+    app = app && (app.default || app);
+    User = User && (User.default || User);
+    Model = Model && (Model.default || Model);
+    LogInButtons = LogInButtons && (LogInButtons.default || LogInButtons);
+    NotificationGrid = NotificationGrid && (NotificationGrid.default || NotificationGrid);
+    SettingsPage = SettingsPage && (SettingsPage.default || SettingsPage);
+
+    if (!app || !extend || !User || !Model || !m) {
+        return;
+    }
+
+    app.initializers.add('nodeloc-telegram', function () {
+        User.prototype.canReceiveTelegramNotifications = Model.attribute('canReceiveTelegramNotifications');
+        User.prototype.nodelocTelegramError = Model.attribute('nodelocTelegramError');
+
+        showTelegramMessage();
+
+        if (LogInButtons) {
+            extend(LogInButtons.prototype, 'items', function (items) {
+                var botUsername = app.forum.attribute('nodeloc-telegram.botUsername');
+
+                if (!botUsername) {
+                    return;
+                }
+
+                items.add('nodeloc-telegram', telegramLoginWidget('/'));
+            });
+        }
+
+        if (NotificationGrid) {
+            extend(NotificationGrid.prototype, 'notificationMethods', function (items) {
+                if (!telegramNotificationsEnabled()) {
+                    return;
+                }
+
+                var user = app.session.user;
+
+                if (!user || !user.canReceiveTelegramNotifications()) {
+                    return;
+                }
+
+                items.add('telegram', {
+                    name: 'telegram',
+                    icon: 'fab fa-telegram-plane',
+                    label: app.translator.trans('nodeloc-telegram.forum.settings.notify_by_telegram_heading'),
+                });
+            });
+        }
+
+        if (SettingsPage) {
+            extend(SettingsPage.prototype, 'accountItems', function (items) {
+                if (!telegramNotificationsEnabled()) {
+                    return;
+                }
+
+                var user = app.session.user;
+
+                if (!user || user.canReceiveTelegramNotifications()) {
+                    return;
+                }
+
+                items.add('nodeloc-telegram', telegramLoginWidget('/settings'));
+            });
+
+            extend(SettingsPage.prototype, 'notificationsItems', function (items) {
+                if (!telegramNotificationsEnabled()) {
+                    return;
+                }
+
+                var user = app.session.user;
+                var botUsername = app.forum.attribute('nodeloc-telegram.botUsername');
+
+                if (!user || !user.nodelocTelegramError() || !botUsername) {
+                    return;
+                }
+
+                items.add('nodelocTelegramError', {
+                    view: function () {
+                        return m('.Alert', m('p', app.translator.trans('nodeloc-telegram.forum.settings.unblock_telegram_bot', {
+                            a: m('a', { href: 'https://t.me/' + botUsername }),
+                            username: '@' + botUsername,
+                        })));
+                    },
+                });
+            });
+        }
+    });
+
+    function telegramLoginWidget(returnTo) {
+        return m('script', {
+            async: true,
+            src: 'https://telegram.org/js/telegram-widget.js?22',
+            'data-telegram-login': app.forum.attribute('nodeloc-telegram.botUsername'),
+            'data-size': 'large',
+            'data-radius': '10',
+            'data-auth-url': app.forum.attribute('baseUrl') + '/auth/telegram?returnTo=' + encodeURIComponent(returnTo),
+            'data-request-access': 'write',
+        });
+    }
+
+    function showTelegramMessage() {
+        var message = new URLSearchParams(window.location.search).get('telegramMessage');
+
+        if (!message || !app.alerts || typeof app.alerts.show !== 'function') {
+            return;
+        }
+
+        app.alerts.show({ type: 'success' }, message);
+
+        var url = new URL(window.location.href);
+        url.searchParams.delete('telegramMessage');
+        window.history.replaceState({}, document.title, url.toString());
+    }
+
+    function telegramNotificationsEnabled() {
+        return !!app.forum.attribute('nodeloc-telegram.enableNotifications')
+            && !!app.session
+            && !!app.session.user
+            && !!app.forum.attribute('nodeloc-telegram.botUsername');
+    }
+
+    function resolve(name, fallback) {
+        if (core[name]) {
+            return core[name];
+        }
+
+        var current = core;
+        var parts = name.split('/');
+
+        for (var i = 0; i < parts.length; i++) {
+            current = current && current[parts[i]];
+        }
+
+        return current || fallback;
+    }
+}());
