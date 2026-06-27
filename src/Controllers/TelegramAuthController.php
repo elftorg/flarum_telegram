@@ -9,6 +9,7 @@ use Flarum\Http\UrlGenerator;
 use Flarum\Locale\Translator;
 use Flarum\Settings\SettingsRepositoryInterface;
 use Laminas\Diactoros\Response\HtmlResponse;
+use Laminas\Diactoros\Stream;
 use Nodeloc\Telegram\Repository\TelegramUserRepository;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface as Request;
@@ -60,7 +61,7 @@ class TelegramAuthController implements RequestHandlerInterface
                 'avatar_url' => $auth['photo_url'] ?? null,
             ]);
 
-            return $this->authResponse->make(
+            $response = $this->authResponse->make(
                 TelegramUserRepository::PROVIDER,
                 $identifier,
                 function (Registration $registration) use ($suggestions): void {
@@ -71,6 +72,8 @@ class TelegramAuthController implements RequestHandlerInterface
                     $registration->setPayload($suggestions);
                 }
             );
+
+            return $this->makeTelegramAuthResponse($response);
         } catch (Exception $e) {
             return $this->processContinue(false, null, $e->getMessage());
         }
@@ -95,6 +98,43 @@ class TelegramAuthController implements RequestHandlerInterface
         return new HtmlResponse(
             "<style>body{text-align:center;padding:20px;padding-top:40vh}p{font-family:sans-serif;font-size:2em;color:#aaa}a{color:#333}</style><p>$info</p><p><a href=\"$href\">$continue</a></p>"
         );
+    }
+
+    protected function makeTelegramAuthResponse(ResponseInterface $response): ResponseInterface
+    {
+        $html = (string) $response->getBody();
+        $payload = '{}';
+
+        if (preg_match('/authenticationComplete\((.*)\);<\/script>/s', $html, $matches)) {
+            $payload = $matches[1];
+        }
+
+        $baseUrl = json_encode($this->url->to('forum')->base(), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+        $safeHtml = <<<HTML
+<script>
+(function () {
+    var payload = $payload;
+
+    if (window.opener && window.opener.app && typeof window.opener.app.authenticationComplete === 'function') {
+        window.opener.app.authenticationComplete(payload);
+        window.close();
+        return;
+    }
+
+    try {
+        window.sessionStorage.setItem('nodelocTelegramAuthPayload', JSON.stringify(payload));
+    } catch (e) {}
+
+    window.location.replace($baseUrl);
+}());
+</script>
+HTML;
+
+        $body = new Stream('php://temp', 'wb+');
+        $body->write($safeHtml);
+        $body->rewind();
+
+        return $response->withBody($body);
     }
 
     /**
