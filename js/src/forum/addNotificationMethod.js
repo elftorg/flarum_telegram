@@ -36,7 +36,7 @@ export default function () {
             return;
         }
 
-        items.add('nodeloc-telegram', telegramLoginWidget('/settings'));
+        items.add('nodeloc-telegram', telegramLoginWidget('/settings', 'nodeloc-telegram.forum.link_telegram_button'));
     });
 
     extend(SettingsPage.prototype, 'notificationsItems', function (items) {
