@@ -1,10 +1,11 @@
-import { extend } from 'flarum/common/extend';
 import LogInModal from 'flarum/forum/components/LogInModal';
 import app from 'flarum/forum/app';
 import m from 'mithril';
 
+import extendMethod from './extendMethod';
+
 export default function () {
-    extend(LogInModal.prototype, 'fields', function (items) {
+    extendMethod(LogInModal.prototype, 'fields', function (items) {
         if (!app.forum.attribute('nodeloc-telegram.botUsername')) {
             return;
         }
