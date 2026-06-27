@@ -2,7 +2,8 @@ import {extend} from 'flarum/extend';
 import app from 'flarum/app';
 import NotificationGrid from 'flarum/components/NotificationGrid';
 import SettingsPage from 'flarum/components/SettingsPage';
-import LogInButton from 'flarum/components/LogInButton';
+
+import {telegramLoginWidget} from './addLoginButton';
 
 export default function () {
     extend(NotificationGrid.prototype, 'notificationMethods', function (items) {
@@ -34,21 +35,7 @@ export default function () {
 
         let user = app.session.user;
         if (user && !user.canReceiveTelegramNotifications()) {
-            // add button to link current account with telegram
-            const authUrl = app.forum.attribute('baseUrl') + '/auth/telegram';
-            const botUsername = app.forum.attribute('nodeloc-telegram.botUsername');
-
-            // Replace the TelegramProvide widget script
-            items.add('nodeloc-telegram',
-                m('script', {
-                    async: true, src: 'https://telegram.org/js/telegram-widget.js?22',
-                    'data-telegram-login': botUsername,
-                    'data-size': 'large',
-                    'data-radius': '10',
-                    'data-auth-url': authUrl,
-                    'data-request-access': 'write'
-                })
-            );
+            items.add('nodeloc-telegram', telegramLoginWidget('nodeloc-telegram.forum.link_telegram_button'));
         }
     });
     extend(SettingsPage.prototype, 'notificationsItems', function (items) {
@@ -76,5 +63,3 @@ export default function () {
         });
     });
 }
-
-
