@@ -1,2 +1,53 @@
-(()=>{var e={n:t=>{var o=t&&t.__esModule?()=>t.default:()=>t;return e.d(o,{a:o}),o},d:(t,o)=>{for(var n in o)e.o(o,n)&&!e.o(t,n)&&Object.defineProperty(t,n,{enumerable:!0,get:o[n]})},o:(e,t)=>Object.prototype.hasOwnProperty.call(e,t),r:e=>{"undefined"!=typeof Symbol&&Symbol.toStringTag&&Object.defineProperty(e,Symbol.toStringTag,{value:"Module"}),Object.defineProperty(e,"__esModule",{value:!0})}},t={};(()=>{"use strict";e.r(t);const o=flarum.core.compat["admin/app"];var n=e.n(o);n().initializers.add("nodeloc-telegram",(function(){n().extensionData.for("nodeloc-telegram").registerSetting({setting:"nodeloc-telegram.botUsername",type:"text",label:n().translator.trans("nodeloc-telegram.admin.settings.field.botUsername")},15).registerSetting({setting:"nodeloc-telegram.botToken",type:"text",label:n().translator.trans("nodeloc-telegram.admin.settings.field.botToken")},15).registerSetting({setting:"nodeloc-telegram.enableNotifications",type:"boolean",label:n().translator.trans("nodeloc-telegram.admin.settings.field.enableNotifications")})}))})(),module.exports=t})();
-//# sourceMappingURL=admin.js.map
+(function () {
+    'use strict';
+
+    var core = window.flarum && window.flarum.core ? window.flarum.core : {};
+    var app = resolve('admin/app', core.app);
+
+    app = app && (app.default || app);
+
+    if (!app) {
+        return;
+    }
+
+    app.initializers.add('nodeloc-telegram', function () {
+        app.extensionData
+            .for('nodeloc-telegram')
+            .registerSetting(
+                {
+                    setting: 'nodeloc-telegram.botUsername',
+                    type: 'text',
+                    label: app.translator.trans('nodeloc-telegram.admin.settings.field.botUsername'),
+                },
+                15
+            )
+            .registerSetting(
+                {
+                    setting: 'nodeloc-telegram.botToken',
+                    type: 'text',
+                    label: app.translator.trans('nodeloc-telegram.admin.settings.field.botToken'),
+                },
+                15
+            )
+            .registerSetting({
+                setting: 'nodeloc-telegram.enableNotifications',
+                type: 'boolean',
+                label: app.translator.trans('nodeloc-telegram.admin.settings.field.enableNotifications'),
+            });
+    });
+
+    function resolve(name, fallback) {
+        if (core[name]) {
+            return core[name];
+        }
+
+        var current = core;
+        var parts = name.split('/');
+
+        for (var i = 0; i < parts.length; i++) {
+            current = current && current[parts[i]];
+        }
+
+        return current || fallback;
+    }
+}());
