@@ -1,3 +1,27 @@
 .LogInButton--telegram {
     .Button--color(#fff, #54a9eb);
 }
+
+.NodelocTelegramLoginButton {
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.NodelocTelegramLoginButton > span {
+    pointer-events: none;
+}
+
+.NodelocTelegramLoginButton script {
+    display: none;
+}
+
+.NodelocTelegramLoginButton iframe {
+    position: absolute !important;
+    inset: 0;
+    width: 100% !important;
+    height: 100% !important;
+    opacity: 0.01;
+}
