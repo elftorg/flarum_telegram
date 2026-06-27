@@ -1,20 +1,28 @@
 import LogInModal from 'flarum/forum/components/LogInModal';
+import SignUpModal from 'flarum/forum/components/SignUpModal';
 import app from 'flarum/forum/app';
 import m from 'mithril';
 
 import extendMethod from './extendMethod';
 
 export default function () {
-    extendMethod(LogInModal.prototype, 'fields', function (items) {
+    addTelegramAuthButton(LogInModal, 'nodeloc-telegram.forum.log_in_with_telegram_button');
+    addTelegramAuthButton(SignUpModal, 'nodeloc-telegram.forum.sign_up_with_telegram_button', true);
+}
+
+function addTelegramAuthButton(ModalClass, labelKey, skipWhenToken = false) {
+    extendMethod(ModalClass.prototype, 'fields', function (items) {
         if (!app.forum.attribute('nodeloc-telegram.botUsername')) {
+            return;
+        }
+
+        if (skipWhenToken && this.attrs && this.attrs.token) {
             return;
         }
 
         items.add(
             'nodeloc-telegram',
-            m('.Form-group.NodelocTelegramLoginFormGroup', telegramLoginWidget(
-                'nodeloc-telegram.forum.log_in_with_telegram_button'
-            )),
+            m('.Form-group.NodelocTelegramLoginFormGroup', telegramLoginWidget(labelKey)),
             -20
         );
     });
