@@ -10,6 +10,7 @@ nodeloc-telegram:
 
     forum:
         log_in_with_telegram_button: Log in with Telegram
+        sign_up_with_telegram_button: Sign up with Telegram
         link_telegram_button: Link Telegram
 
         auth:
